@@ -1,0 +1,104 @@
+#!/usr/bin/php
+<?php
+/**
+ * YukkuriTalkClient
+ * 標準入力もしくは引数で指定された文字を発声する
+ * 発声はwav生成サーバからファイルを受け取りそれを再生する方法で行う
+ * 
+ * @package		YukkuriTalkClient
+ * @author		松井 健太郎 (Kentaro Matsui) <info@ke-tai.org>
+ * @copyright	ke-tai.org
+ * @license		BSD
+ * @link		http://www.a-quest.com/products/aquestalk.html
+ */
+
+// 実行パス設定
+chdir(dirname(__FILE__));
+
+// セリフを取得
+if (isset($argv[1])) {
+	// 引数がある場合はそちらを優先
+	$lines = $argv[1];
+} else {
+	// 引数が無い場合は標準入力を利用
+	$lines = file_get_contents('php://stdin');
+}
+
+// 発声
+$yt = new Yukkuri_Talk_Client();
+$yt->talk($lines);
+
+
+/**
+ * Yukkuri_Talk_Clientクラス
+ * 引数で指定された文字を発声するためのクラス
+ */
+class Yukkuri_Talk_Client
+{
+	protected $api_url = 'http://localhost/~matsui/YukkuriTalkServer/yukkuritalk.php';		// wavを返すサーバのURL
+	protected $msg_ok = '[talked]';						// 実行成功時のメッセージ
+	protected $msg_ng = '[error]';						// エラーの場合のメッセージ
+	protected $encoding = 'UTF-8';						// 内部で使用されるエンコーディング
+	protected $tmp_dir = '/tmp/';						// テンポラリファイルの置き場所
+	protected $tmp_prefix = 'yukkuri_talk_client_';		// テンポラリファイルの接頭語
+	protected $exec_cmd = 'aplay %TMP_WAV% >/dev/null 2>&1';		// 実行されるコマンド
+
+	/**
+	 * コンストラクタ
+	 * @param array $config 設定を格納した連想配列
+	 */
+	public function __construct($config = array())
+	{
+		// configで指定された設定でクラス変数を上書き
+		foreach ($config as $key => $val) {
+			$this->$key = $val;
+		}
+	}
+
+	/**
+	 * 発声
+	 * 外部から発声を実行させるためのメソッド
+	 * @param string $lines 発声させたいセリフ
+	 */
+	public function talk($lines)
+	{
+		$lines = trim($lines);
+
+		// postするデータ
+		$post = array('lines' => $lines);
+
+		// 保存先となるテンポラリファイル名
+		$uniq = microtime(true);
+		$tmp_wav = $this->tmp_dir . $this->tmp_prefix . $uniq . '.wav';
+
+		$ch = curl_init();
+		$fp = fopen($tmp_wav, 'w');
+		curl_setopt($ch, CURLOPT_FILE, $fp);
+		curl_setopt($ch, CURLOPT_HEADER, 0);
+		curl_setopt($ch, CURLOPT_URL, $this->api_url);
+		curl_setopt($ch, CURLOPT_POST, 1);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+		curl_exec($ch);
+		curl_close($ch);
+		fclose($fp);
+
+		$tr_arr = array(
+			'%TMP_WAV%' => escapeshellarg($tmp_wav),
+		);
+		$cmd = strtr($this->exec_cmd, $tr_arr);		// 実行されるコマンド
+
+		// コマンドの実行
+		exec($cmd, $output, $return_var);			// コマンドの実行
+		if (empty($output) and 0 === $return_var) {
+			$msg = $this->msg_ok . ' (' . $lines . ')';
+		} else {
+			$msg = $this->msg_ng . ' ' . implode('\n', $output) . ' (' . $lines . ')';
+		}
+		echo $msg . "\n";
+
+		// テンポラリファイルの削除
+		if (file_exists($tmp_wav)) {
+			unlink($tmp_wav);
+		}
+	}
+}
