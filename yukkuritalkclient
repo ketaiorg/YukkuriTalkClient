@@ -62,33 +62,24 @@ class Yukkuri_Talk_Client
 	 */
 	public function talk($lines)
 	{
-		$lines = trim($lines);
-
-		// postするデータ
-		$post = array('lines' => $lines);
-
 		// 保存先となるテンポラリファイル名
 		$uniq = microtime(true);
 		$tmp_wav = $this->tmp_dir . $this->tmp_prefix . $uniq . '.wav';
 
-		$ch = curl_init();
-		$fp = fopen($tmp_wav, 'w');
-		curl_setopt($ch, CURLOPT_FILE, $fp);
-		curl_setopt($ch, CURLOPT_HEADER, 0);
-		curl_setopt($ch, CURLOPT_URL, $this->api_url);
-		curl_setopt($ch, CURLOPT_POST, 1);
-		curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
-		curl_exec($ch);
-		curl_close($ch);
-		fclose($fp);
+		// wavファイルのダウンロード
+		if (!$this->getWavFile($lines, $tmp_wav)) {
+			// ダウンロードエラー
+			$err_msg = $this->msg_ng . ' API error. (' . $lines . ')';
+			echo $err_msg . "\n";
+			exit(0);
+		}
 
-		$tr_arr = array(
-			'%TMP_WAV%' => escapeshellarg($tmp_wav),
-		);
-		$cmd = strtr($this->exec_cmd, $tr_arr);		// 実行されるコマンド
+		// 実行されるコマンド
+		$tr_arr = array('%TMP_WAV%' => escapeshellarg($tmp_wav));
+		$cmd = strtr($this->exec_cmd, $tr_arr);
 
 		// コマンドの実行
-		exec($cmd, $output, $return_var);			// コマンドの実行
+		exec($cmd, $output, $return_var);
 		if (empty($output) and 0 === $return_var) {
 			$msg = $this->msg_ok . ' (' . $lines . ')';
 		} else {
@@ -100,5 +91,42 @@ class Yukkuri_Talk_Client
 		if (file_exists($tmp_wav)) {
 			unlink($tmp_wav);
 		}
+
+		// 正常終了
+		exit(0);
+	}
+
+	/**
+	 * wavファイルダウンロード
+	 * @param string $lines 発声させたいセリフ
+	 * @param string $tmp_wav 保存先のパス
+	 * @return bool ダウンロードの成否
+	 */
+	protected function getWavFile($lines, $tmp_wav)
+	{
+		// postするデータ
+		$post = array('lines' => trim($lines));
+
+		// ダウンロード
+		$ch = curl_init();
+		$fp = fopen($tmp_wav, 'w');
+		curl_setopt($ch, CURLOPT_FILE, $fp);
+		curl_setopt($ch, CURLOPT_HEADER, 0);
+		curl_setopt($ch, CURLOPT_URL, $this->api_url);
+		curl_setopt($ch, CURLOPT_POST, 1);
+		curl_setopt($ch, CURLOPT_POSTFIELDS, $post);
+		curl_exec($ch);
+		fclose($fp);
+
+		// ステータスコードで分岐
+		$header = curl_getinfo($ch);
+		if ('200' == $header['http_code'] and 'application/octet-stream' == $header['content_type']) {
+			$ret = true;
+		} else {
+			$ret = false;
+		}
+
+		curl_close($ch);
+		return $ret;
 	}
 }
