@@ -10,6 +10,7 @@
  * @copyright	ke-tai.org
  * @license		BSD
  * @link		http://www.a-quest.com/products/aquestalk.html
+ * @link		http://github.com/ketaiorg/YukkuriTalkServer/
  */
 
 // 実行パス設定
@@ -35,10 +36,9 @@ $yt->talk($lines);
  */
 class Yukkuri_Talk_Client
 {
-	protected $api_url = 'http://localhost/~matsui/YukkuriTalkServer/yukkuritalk.php';		// wavを返すサーバのURL
+	protected $api_url = 'http://localhost/YukkuriTalkServer/yukkuritalk.php';		// wavを返すサーバのURL
 	protected $msg_ok = '[talked]';						// 実行成功時のメッセージ
 	protected $msg_ng = '[error]';						// エラーの場合のメッセージ
-	protected $encoding = 'UTF-8';						// 内部で使用されるエンコーディング
 	protected $tmp_dir = '/tmp/';						// テンポラリファイルの置き場所
 	protected $tmp_prefix = 'yukkuri_talk_client_';		// テンポラリファイルの接頭語
 	protected $exec_cmd = 'aplay %TMP_WAV% >/dev/null 2>&1';		// 実行されるコマンド
